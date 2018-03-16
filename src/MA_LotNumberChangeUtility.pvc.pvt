@@ -1,11 +1,11 @@
 ! ** Utility to change lot numbers for DIMEX
 ! ** @Author Andrew Holzman
 ! ** @Date 2018.1.17
-! o=new("MA_LotNumberChangeUtility",%sys_ss);o'ChangeLots("C:\Users\martin\Desktop\DLLLotSerialNumbers.csv")
+! o=new("MA_LotNumberChangeUtility",%sys_ss);o'ChangeLots() 
 
 DEF CLASS "MA_LotNumberChangeUtility"
 
-	FUNCTION ChangeLots(FilePath$)PROCESS
+	FUNCTION ChangeLots()PROCESS
 	FUNCTION LOCAL LogOpenFile(oObject,filePath$)LOG_OPEN_FILE
 	FUNCTION LOCAL OpenFiles()OPEN_FILES
 
@@ -24,14 +24,17 @@ DEF CLASS "MA_LotNumberChangeUtility"
 END DEF
 !
 PROCESS:
-	ENTER FilePath$
+	FilePath$ = "C:\Users\martin\Desktop\DLLLotSerialNumbers.csv"
 	_OBJ'OpenFiles()
 	counter=0
 
 	answer$ = %sys_ss'UI'MessageBox$("1","Run Utility?","style=YESNO,icon=!")
 	IF (answer$ = "YES") {
 		cCSVFH = HFN
-		didOpen = 0
+		itemCostCounter=0
+		soTierDistcounter=0
+		so404TierCounter=0
+		IM404Counter=0
 		mwaRetVal = _OBJ'LogOpenFile(cCSVFH,FilePath$)
 		IF (mwaRetVal = 1) {
 			DIM fileData$[12]
@@ -62,40 +65,47 @@ PROCESS:
 					rec.UDF_FORMATTEDLOTNO$ = currentSageLot$
 					WRITE(IM_ItemCostFH,REC=rec$)
 					REMOVE(IM_ItemCostFH,KEY=oldKey$)
-					%sys_ss'UI'MessageBox$("1","IM_ItemCost record modified")
-				} ELSE {
-					%sys_ss'UI'MessageBox$("1","Failed to locate IM_ItemCost record")
+					itemCostCounter++	
 				}
-				!
-				counter=0
 				SELECT *, REC=rec$ FROM SO_SalesOrderDistFH, KNO="kItemWarehouse" BEGIN itemNo$:whseCode$:currentSageLot$:$00$ END itemNo$:whseCode$:currentSageLot$:$FE$
 					oldKey$ = KEC(OS_SalesOrderDistFH)
+					oldSONo$ = rec.SalesOrderNo$
+					oldLineKey$ = rec.LineKey$
+					oldLotSerialNo$ = rec.LotSerialNo$
+
 					rec.LotSerialNo$ = serialNo$
 					WRITE(SO_SalesOrderDistFH,REC=rec$)
-					REMOVE(SO_SalesOrderDistFH,KEY=oldKey$)
-					counter++
+					REMOVE(SO_SalesOrderDistFH,KEY=oldSONo$:oldLineKey$:oldLotSerialNo$)
+					soTierDistcounter++
 				NEXT RECORD
-				%sys_ss'UI'MessageBox$("1","SO_SalesOrderTierDistribution Records Affected: " + STR(counter))
 				!
-				counter=0
 				SELECT *, REC=rec$ FROM SO404_OrderTierDistFH, KNO="kItem" BEGIN itemNo$:whseCode$:currentSageLot$:binLocation$:$00$ END itemNo$:whseCode$:currentSageLot$:binLocation$:$FE$
 					oldKey$ = KEC(SO404_OrderTierDistFH)
+					oldSalesOrderNo$ = rec.SalesOrderNo$
+					oldLineKey$ = rec.LineKey$
+					oldLotSerialNo$ = rec.LotSerialNo$
+					oldBinLocation$ = rec.binLocation$
+					oldPalletID$ = rec.PalletID$
+
 					rec.LotSerialNo$ = serialNo$
 					WRITE(SO404_OrderTierDistFH,REC=rec$)
-					REMOVE(SO404_OrderTierDistFH,KEY=oldKey$)
-					counter++
+					REMOVE(SO404_OrderTierDistFH,KEY=oldSalesOrderNo$:oldLineKey$:oldLotSerialNo$:oldBinLocation$:oldPalletID$)
+					so404TierCounter++
 				NEXT RECORD
-				%sys_ss'UI'MessageBox$("1","SO404_OrderTierDist Records Affected: " + STR(counter))
 				!
-				counter=0
 				SELECT *, REC=rec$ FROM IM404_ItemLocQtyFH,KNO="kItemloc" BEGIN whseCode$:itemNo$:binLocation$:currentSageLot$:$00$ END whseCode$:itemNo$:binLocation$:currentSageLot$:$FE$
 					oldKey$ = KEC(IM404_ItemLocQtyFH)
+					oldItemCode$ = rec.ItemCode$
+					oldWhseCode$ = rec.WarehouseCode$
+					oldLotSerialNo$ = rec.LotSerialNo$
+					oldBinLocation$ = rec.BinLocation$
+					oldPalletID$ = rec.PalletID$
+
 					rec.LotSerialNo$ = serialNo$
 					WRITE(IM404_ItemLocQtyFH,REC=rec$)
-					REMOVE(IM404_ItemLocQtyFH,KEY=oldKey$)
-					counter++
+					REMOVE(IM404_ItemLocQtyFH,KEY=oldItemCode$:oldWhseCode$:oldLotSerialNo$:oldBinLocation$:oldPalletID$)
+					IM404Counter++
 				NEXT RECORD
-				%sys_ss'UI'MessageBox$("1","IM404_BinLocationQty Records Affected: " + STR(counter))
 				!
 				! maybe?
 				!SO404_OrderAllocHeadFH
@@ -103,6 +113,7 @@ PROCESS:
 				!IM_ItemLocUDFFH
 
 			WEND
+			MSGBOX("Utility Finished. IM_ITemCost Recs: " + STR(itemCostCounter) + "| SO Tier Dist Recs: " + STR(soTierDistcounter) +"| SO 404 Recs: " + STR(so404TierCounter) + "| IM404 Recs: " + STR(IM404Counter))
 		} ELSE {
 			 %sys_ss'UI'MessageBox$("1","Failed to open the file")
 		}
