@@ -24,7 +24,7 @@ DEF CLASS "MA_LotNumberChangeUtility"
 END DEF
 !
 PROCESS:
-	FilePath$ = "C:\Users\martin\Desktop\DLLLotSerialNumbers.csv"
+	FilePath$ = "C:\Sage\DLLLotSerialNumbers.csv"
 	_OBJ'OpenFiles()
 	counter=0
 
@@ -37,28 +37,30 @@ PROCESS:
 		IM404Counter=0
 		mwaRetVal = _OBJ'LogOpenFile(cCSVFH,FilePath$)
 		IF (mwaRetVal = 1) {
-			DIM fileData$[12]
+			DIM fileData$[11]
 			counter=0
 			READ(cCSVFH, ERR=*NEXT)line$ ! skip the first line of headers
 			WHILE (1)
 				READ(cCSVFH, END=*BREAK)line$
 				READ DATA FROM line$,SEP="," TO fileData${all}
 				currentSageLot$ = fileData$[0]
-				comment$ = fileData$[1]
-				serialNo$ = fileData$[2]
-				timeStamp$ = fileData$[3]
-				qty$ = fileData$[4]
-				itemNo$ = fileData$[5]
-				skidNo$ = fileData$[6]
-				lotSerialNo$ = fileData$[7]
-				binLocation$ = fileData$[8]
-				whseCode$ = fileData$[9]
-				newSageLotNo$ = fileData$[10]
-				companyCode$ = fileData$[11]
+				!comment$ = fileData$[1]
+				serialNo$ = fileData$[1]
+				timeStamp$ = fileData$[2]
+				qty$ = fileData$[3]
+				itemNo$ = fileData$[4]
+				skidNo$ = fileData$[5]
+				lotSerialNo$ = fileData$[6]
+				binLocation$ = fileData$[7]
+				whseCode$ = fileData$[8]
+				newSageLotNo$ = fileData$[9]
+				companyCode$ = fileData$[10]
 
 				recFound=0
+				!MSGBOX(currentSageLot$ + "|" + whseCode$ + "|" + itemNo$)
 				READ(IM_ItemCostFH,REC=rec$,KEY=itemNo$:whseCode$:TierType$:currentSageLot$,DOM=*NEXT);recFound=1
 				IF (recFound) {
+
 					oldKey$ = KEC(IM_ItemCostFH)
 					rec.GroupSort$ = serialNo$
 					rec.LotSerialNo$ = serialNo$
@@ -68,7 +70,7 @@ PROCESS:
 					itemCostCounter++	
 				}
 				SELECT *, REC=rec$ FROM SO_SalesOrderDistFH, KNO="kItemWarehouse" BEGIN itemNo$:whseCode$:currentSageLot$:$00$ END itemNo$:whseCode$:currentSageLot$:$FE$
-					oldKey$ = KEC(OS_SalesOrderDistFH)
+					oldKey$ = KEC(SO_SalesOrderDistFH)
 					oldSONo$ = rec.SalesOrderNo$
 					oldLineKey$ = rec.LineKey$
 					oldLotSerialNo$ = rec.LotSerialNo$
@@ -76,6 +78,7 @@ PROCESS:
 					rec.LotSerialNo$ = serialNo$
 					WRITE(SO_SalesOrderDistFH,REC=rec$)
 					REMOVE(SO_SalesOrderDistFH,KEY=oldSONo$:oldLineKey$:oldLotSerialNo$)
+					!REMOVE(SO_SalesOrderDistFH,KEY=oldKey$)
 					soTierDistcounter++
 				NEXT RECORD
 				!
@@ -111,7 +114,7 @@ PROCESS:
 				!SO404_OrderAllocHeadFH
 				!SO404_OrderAllocDetFH
 				!IM_ItemLocUDFFH
-
+			counter++
 			WEND
 			MSGBOX("Utility Finished. IM_ITemCost Recs: " + STR(itemCostCounter) + "| SO Tier Dist Recs: " + STR(soTierDistcounter) +"| SO 404 Recs: " + STR(so404TierCounter) + "| IM404 Recs: " + STR(IM404Counter))
 		} ELSE {
@@ -126,7 +129,7 @@ LOG_OPEN_FILE:
 	ENTER (oObject),(filePath$)
 	Open(oObject,ERR=*NEXT)filePath$;mwaRetVal=1
 	IF mwaRetVal=0 {
-		_OBJ'LogMessage(2,"Failed to open file " + filePath$)
+		!_OBJ'LastErrorMsg$ = "Failed to open file " + filePath$
 	}
 RETURN mwaRetVal
 !
