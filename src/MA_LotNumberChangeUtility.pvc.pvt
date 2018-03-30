@@ -44,17 +44,17 @@ PROCESS:
 				READ(cCSVFH, END=*BREAK)line$
 				READ DATA FROM line$,SEP="," TO fileData${all}
 				currentSageLot$ = fileData$[0]
-				!comment$ = fileData$[1]
-				serialNo$ = fileData$[1]
-				timeStamp$ = fileData$[2]
-				qty$ = fileData$[3]
-				itemNo$ = fileData$[4]
-				skidNo$ = fileData$[5]
-				lotSerialNo$ = fileData$[6]
-				binLocation$ = fileData$[7]
-				whseCode$ = fileData$[8]
-				newSageLotNo$ = fileData$[9]
-				companyCode$ = fileData$[10]
+				comment$ = fileData$[1]
+				serialNo$ = fileData$[2]
+				timeStamp$ = fileData$[3]
+				qty$ = fileData$[4]
+				itemNo$ = fileData$[5]
+				skidNo$ = fileData$[6]
+				lotSerialNo$ = fileData$[7]
+				binLocation$ = fileData$[8]
+				whseCode$ = fileData$[9]
+				newSageLotNo$ = fileData$[10]
+				companyCode$ = fileData$[11]
 
 				recFound=0
 				!MSGBOX(currentSageLot$ + "|" + whseCode$ + "|" + itemNo$)
