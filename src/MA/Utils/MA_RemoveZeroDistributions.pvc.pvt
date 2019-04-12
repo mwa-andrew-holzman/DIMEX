@@ -1,0 +1,17 @@
+DEF CLASS "MA_RemoveZeroDistrubtions"
+	FUNCTION PROCESS(orderNo$)PROCESS
+END DEF 
+!
+PROCESS:
+	ENTER orderNo$
+	fh = %sys_ss'OpenTable("SO404_OrderTierDist","COMPANY")
+	writeFH = %sys_ss'OpenTable("SO404_OrderTierDist","COMPANY")
+	SELECT *, REC=rec$ FROM fh BEGIN orderNo$:$$ END $FE$
+		! if distribution qty is zero on this record, remove it
+		IF (rec.QuantityDistribted = 0) {
+			REMOVE(writeFH, REC=rec$)
+		}
+	NEXT RECORD
+	CLOSE(fh); fh=0
+	CLOSE(wriiteFH); writeFH=0
+RETURN mwaRetVal

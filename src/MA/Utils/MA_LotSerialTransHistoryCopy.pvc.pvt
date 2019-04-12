@@ -1,0 +1,29 @@
+! o=new("MA_LotSerialTransHistoryCopy",%sys_Ss);o'PRocess()
+DEF CLASS "MA_LotSerialTransHistoryCopy"
+	FUNCTION PROCESS()PROCESS
+END DEF 
+!
+PROCESS:
+	histFH = %sys_ss'OpenTable("IM_LotSerialTransactionHistory","COMPANY")
+	costFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+	writeCount=0
+	SELECT *, REC=histRec$ FROM histFH BEGIN $00$ END $FE$
+		validRead=0
+		item$ = histRec.ItemCode$
+		whse$ = histRec.WarehouseCode$
+		tier$ = "3"
+		lotSerial$ = histRec.LotSerialNo$
+
+		SELECT *, REC=costRec$ FROM costFH BEGIN item$:whse$:tier$:$$ END item$:whse$:tier$:$FE$
+			IF (NUM(costRec.TransactionDate$) > 20170101) {
+				IF (costRec.UDF_FormattedLotNo$ = lotSerial$) {
+					! found cost record containing the old lot number for this item. update lot serial no and set the udf
+					histRec.LotSerialNo$ = costRec.LotSerialNo$
+					histRec.UDF_FormattedLotNo$ = costRec.UDF_FormattedLotNo$
+					WRITE(histFH,REC=histRec$);writeCount++
+				}
+			}
+		NEXT RECORD
+	NEXT RECORD
+	msgbox("Lot Conversion Complete. Write Count: "  + STR(writeCount))
+RETURN retSUCCESS
