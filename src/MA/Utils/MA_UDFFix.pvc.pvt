@@ -1,0 +1,117 @@
+! ** Utility to change lot numbers for DIMEX
+! ** @Author Andrew Holzman
+! ** @Date 2018.1.17
+! o=new("MA_UDFFix",%sys_ss);o'ChangeLots() 
+
+DEF CLASS "MA_UDFFix"
+
+	FUNCTION ChangeLots()PROCESS
+	FUNCTION FixLocQty()PROCESS_LOCQTY
+	FUNCTION ResyncItemCost()PROCESS_AGAINST_FGINV
+	FUNCTION LOCAL LogOpenFile(oObject,filePath$)LOG_OPEN_FILE
+	FUNCTION LOCAL OpenFiles()OPEN_FILES
+
+	LOCAL TierType$ = "3"
+
+	! maybe?
+	! LOCAL SO404_OrderAllocHeadFH
+	! LOCAL SO404_OrderAllocDetFH
+	! LOCAL IM_ItemLocUDFFH
+
+END DEF
+!
+PROCESS:
+	FilePath$ = "C:\Sage\UDFFix.csv"
+	counter=0
+
+	answer$ = %sys_ss'UI'MessageBox$("1","Run Utility To fix UDF_FormattedLotNo?","style=YESNO,icon=!")
+	IF (answer$ = "YES") {
+		cCSVFH = HFN
+		mwaRetVal = _OBJ'LogOpenFile(cCSVFH,FilePath$)
+		!msgbox(STR(mwaRetVal))
+		IF (mwaRetVal = 1) {
+			!DIM fileData$[7]
+
+			DIM fileData$[5]
+			counter=0
+			itemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+			itemLocFH = %sys_ss'OpenTable("IM404_ItemLocationQuantity","COMPANY")
+
+			READ(cCSVFH, ERR=*NEXT)line$ ! skip the first line of headers
+			WHILE (1)
+				READ(cCSVFH, END=*BREAK)line$
+				READ DATA FROM line$,SEP="," TO fileData${all}
+
+				itemNo$ = fileData$[0]
+				whseNo$ = fileData$[1]
+				tierType$ = fileData$[2]
+				groupSort$ = fileData$[3]
+				badUDF$ = fileData$[4]
+				goodUDF$ = fileData$[5]
+
+				recFound=0
+				READ(itemCostFH,REC=rec$,KEY=itemNo$:whseNo$:tierType$:groupSort$,ERR=*NEXT);recFound=1
+				IF (recFound) {
+					IF (rec.UDF_FormattedLotNo$ <> goodUDF$) {
+						rec.UDF_FormattedLotNo$ = goodUDF$
+						WRITE(itemCostFH,REC=rec$);counter++
+					}
+				}
+			WEND
+
+
+			!SELECT *, REC=rec$ FROM itemLocFH BEGIN $$ END $FE
+			!	validRead=0
+			!	READ(itemCostFH,REC=costRec$,KEY=rec.ItemCode$:rec.WarehouseCode$:"3":rec.LotSerialNo$,ERR=*NEXT);validRead=1
+			!	IF (rec.UDF_FormattedLotNo$ = "") {
+			!		rec.UDF_FormattedLotNo$ = costRec.UDF_FormattedLotNo$
+			!		WRITE(itemLocFH,REC=rec$);writeCounter++
+			!	}
+			!NEXT RECORD
+			CLOSE(itemCostFH)
+			!CLOSE(itemLocFH)
+			msgbox("done: " + STR(counter))
+		}
+	}
+
+RETURN mwaRetVal
+!
+PROCESS_LOCQTY:
+	!loop through im_itemwarehouse
+	! set the udf_formattedlotno on im404_itemlocationqty to the value of im_itemwarehouse udf_formattedlotno
+
+	itemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+	itemLocFH = %sys_ss'OpenTable("IM404_ItemLocationQuantity","COMPANY")
+	SELECT *, REC=rec$ FROM itemLocFH BEGIN $$ END $FE
+		validRead=0
+		READ(itemCostFH,REC=costRec$,KEY=rec.ItemCode$:rec.WarehouseCode$:"3":rec.LotSerialNo$,ERR=*NEXT);validRead=1
+		IF (rec.UDF_FormattedLotNo$ <> costRec.UDF_FormattedLotNo$) {
+			rec.UDF_FormattedLotNo$ = costRec.UDF_FormattedLotNo$
+			WRITE(itemLocFH,REC=rec$);writeCounter++
+		}
+	NEXT RECORD 
+RETURN writeCounter
+!
+PROCESS_AGAINST_FGINV:
+
+	!query fg inv and build a recordset 
+	! loop through im_itemcost and then find the matching record in the fginv log table
+	! compare the value of UDF_FormattedLotNo with what we should be seeing in FGInvLog
+	! if they are not the same, fix it and write IM_ItemCost
+	! update IM404_ItemLocQtyFH with vlaues from im_itemcost
+RETURN mwaRetVal
+!
+LOG_OPEN_FILE:
+	ENTER (oObject),(filePath$)
+	Open(oObject,ERR=*NEXT)filePath$;mwaRetVal=1
+	IF mwaRetVal=0 {
+	}
+RETURN mwaRetVal
+!
+OPEN_FILES:
+	
+	!SO_SalesOrderDistFH = %sys_ss'OpenTable("SO_SalesOrderTierDistribution","COMPANY")
+	!SO404_OrderTierDistFH = %sys_ss'OpenTable("SO404_OrderTierDist","COMPANY")
+	!IM_ItemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+	!IM404_ItemLocQtyFH = %sys_ss'OpenTable("IM404_ItemLocationQuantity","COMPANY")
+RETURN retSUCCESS
