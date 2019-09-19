@@ -34,7 +34,7 @@ RESYNC_ITEM_COST:
 	!memFH = lfo
 
 	SQLBaseCommand$ = "SELECT S.ItemCode,S.WarehouseCode,S.TierType,S.GroupSort,S.UDF_FormattedLotNo, F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6) as 'CorrectUDF' "
-	SQLFrom$ = "FROM dll64...im_itemcost S LEFT OUTER JOIN FinishedGoods.dbo.FGINVENTORY_LOG F ON F.item = S.ItemCode and F.SN = S.GroupSort "
+	SQLFrom$ = "FROM dll64...im_itemcost S LEFT OUTER JOIN FinishedGoods.dbo.FGINVENTORY_LOG F ON F.item = S.ItemCode and cast(F.SN as nvarchar (max)) = S.GroupSort  "
 	SQLWhere$ = "WHERE F.Comment = 'Upload' and S.QuantityOnHand>0 and LEN(S.LotSerialNo) < 7 and S.UDF_FormattedLotNo <> F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6)  and Len(F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6) ) < 16"
 	SQLCommand$ = SQLBaseCommand$ + SQLFrom$ + SQLWhere$
 
