@@ -1,0 +1,104 @@
+PARSE_DATES:
+	! file has dates in format like "Apr 6, 2020 11:23:342"	
+	! parse dates into YYYYMMDD
+	! OrderDate stored in Column 99, ShipDate stored in Column 98
+
+
+	orderDate$ = IMP$[4]
+	ttMonth$ = MID(orderDate$,1,3) !"Apr"
+	tDay$ = MID(orderDate$,5,POS(",",orderDate$)-5) ! "7, 2020" - ", 2020"
+	tYear$ = MID(orderDate$,POS(",",orderDate$)+2,4) ! "2020"
+	SWITCH (UCS(ttMonth$))
+		CASE "JAN"
+			tMonth$ = "01"
+			BREAK
+		CASE "FEB"
+			tMonth$ = "02"
+			BREAK
+		CASE "MAR"
+			tMonth$ = "03"
+			BREAK
+		CASE "APR"
+			tMonth$ = "04"
+			BREAK
+		CASE "MAY"
+			tMonth$ = "05"
+			BREAK
+		CASE "JUN"
+			tMonth$ = "06"
+			BREAK
+		CASE "JUL"
+			tMonth$ = "07"
+			BREAK
+		CASE "AUG"
+			tMonth$ = "08"
+			BREAK
+		CASE "SEP"
+			tMonth$ = "09"
+			BREAK
+		CASE "OCT"
+			tMonth$ = "10"
+			BREAK
+		CASE "NOV"
+			tMonth$ = "11"
+			BREAK
+		CASE "DEC"
+			tMonth$ = "12"
+			BREAK
+		DEFAULT	
+			tMonth$ = "FAILED ORDER DATE PARSE"
+	END SWITCH 
+	
+	newDate$ = tYear$+tMonth$+PAD(tDay$,2,0,"0")
+	IMP$[99] = newDate$
+
+
+	shipDate$ = IMP$[5]
+	ttMonth$ = MID(shipDate$,1,3) !"Apr"
+	tDay$ = MID(shipDate$,5,POS(",",shipDate$)-5) ! "7, 2020" - ", 2020"
+	tYear$ = MID(shipDate$,POS(",",shipDate$)+2,4) ! "2020"
+	SWITCH (UCS(ttMonth$))
+		CASE "JAN"
+			tMonth$ = "01"
+			BREAK
+		CASE "FEB"
+			tMonth$ = "02"
+			BREAK
+		CASE "MAR"
+			tMonth$ = "03"
+			BREAK
+		CASE "APR"
+			tMonth$ = "04"
+			BREAK
+		CASE "MAY"
+			tMonth$ = "05"
+			BREAK
+		CASE "JUN"
+			tMonth$ = "06"
+			BREAK
+		CASE "JUL"
+			tMonth$ = "07"
+			BREAK
+		CASE "AUG"
+			tMonth$ = "08"
+			BREAK
+		CASE "SEP"
+			tMonth$ = "09"
+			BREAK
+		CASE "OCT"
+			tMonth$ = "10"
+			BREAK
+		CASE "NOV"
+			tMonth$ = "11"
+			BREAK
+		CASE "DEC"
+			tMonth$ = "12"
+			BREAK
+		DEFAULT	
+			newDate$ = "FAILED SHIP DATE PARSE"
+	END SWITCH 
+	
+	newDate$ = tYear$+tMonth$+PAD(tDay$,2,0,"0")
+	IMP$[98] = newDate$
+
+	RETURN

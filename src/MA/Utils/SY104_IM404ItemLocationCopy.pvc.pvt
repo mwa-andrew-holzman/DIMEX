@@ -1,0 +1,20 @@
+! o=new("MA_IM404ItemLocationQty",%sys_ss);o'Process()
+DEF CLASS "SY104_IM404ItemLocationCopy"
+	FUNCTION PROCESS()PROCESS
+END DEF
+
+PROCESS:
+	!loop through im_itemwarehouse
+	! set the udf_formattedlotno on im404_itemlocationqty to the value of im_itemwarehouse udf_formattedlotno
+
+	itemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+	itemLocFH = %sys_ss'OpenTable("IM404_ItemLocationQuantity","COMPANY")
+	SELECT *, REC=rec$ FROM itemLocFH BEGIN $$ END $FE
+		validRead=0
+		READ(itemCostFH,REC=costRec$,KEY=rec.ItemCode$:rec.WarehouseCode$:"3":rec.LotSerialNo$,ERR=*NEXT);validRead=1
+		IF (rec.UDF_FormattedLotNo$ = "") {
+			rec.UDF_FormattedLotNo$ = costRec.UDF_FormattedLotNo$
+			WRITE(itemLocFH,REC=rec$);writeCounter++
+		}
+	NEXT RECORD 
+RETURN writeCounter

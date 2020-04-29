@@ -3,16 +3,14 @@ DEF CLASS "MA_ResyncItemCost"
 
 	LOCAL POSConnServer$="NTServer18"
 	LOCAL POSConnDatabase$="FinishedGoods"
-	!LOCAL POSConnServer$="10.1.100.19"
-	!LOCAL POSConnDatabase$="twretDEV"
 	LOCAL POSConnUsername$="SA"
 	LOCAL POSConnPassword$="71779121375"
 	LOCAL SQLSchema$="dbo"
 
 	LOCAL memFH
 
-	FUNCTION ResyncItemCost()RESYNC_ITEM_COST
-
+	FUNCTION ResyncItemCost(Company$)RESYNC_ITEM_COST
+	FUNCTION FixLocQty()PROCESS_LOCQTY
 	FUNCTION LOCAL OpenConn(Server$,Database$,Username$,Password$)OPEN_CONN
 	FUNCTION LOCAL DeleteObject(oObject)DELETE_OBJECT
 	FUNCTION LOCAL FreeSQLQuery(oObject)FREE_SQL_QUERY
@@ -20,23 +18,23 @@ DEF CLASS "MA_ResyncItemCost"
 END DEF
 !
 RESYNC_ITEM_COST:
+	ENTER Company$
 	itemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
 	! run a query to build a table of all records where the UDFs in ItemCost do match what they should in FG_InventoryLog
 	! store in memfh and then compare item cost to memfh
 	CONN=_OBJ'OpenConn(POSConnServer$, POSConnDatabase$, POSConnUsername$, POSConnPassword$)
+	
 	IF NOT(CONN)  { RETURN retFAILURE }
 
-	FGInvIOL$ = CPL("IOLIST FileKey$,ItemCode$, WarehouseCode$, TierType$, GroupSort$, UDF_FormattedLotNo$, CorrectUDF$") 
-	!OPEN (HFN,IOL=FGInvIOL$)"*memory*;keydef=[1:1:30],[2:1:3],[3:1:1],[4:1:15]"
-	memFH = HFN
-	OPEN(memFH)"*memory*"
-
-	!memFH = lfo
-
-	SQLBaseCommand$ = "SELECT S.ItemCode,S.WarehouseCode,S.TierType,S.GroupSort,S.UDF_FormattedLotNo, F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6) as 'CorrectUDF' "
-	SQLFrom$ = "FROM dll64...im_itemcost S LEFT OUTER JOIN FinishedGoods.dbo.FGINVENTORY_LOG F ON F.item = S.ItemCode and cast(F.SN as nvarchar (max)) = S.GroupSort  "
-	SQLWhere$ = "WHERE F.Comment = 'Upload' and S.QuantityOnHand>0 and LEN(S.LotSerialNo) < 7 and S.UDF_FormattedLotNo <> F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6)  and Len(F.lot + RIGHT('000' + CAST('000' + F.skidnum AS VARCHAR(3)), 3) + RIGHT('000000' + CAST(F.weight AS VARCHAR(6)), 6) ) < 16"
-	SQLCommand$ = SQLBaseCommand$ + SQLFrom$ + SQLWhere$
+	IF (Company$ = "DLL") {
+		SQLCommand$ = "EXEC dbo.spSageMismatchedLotsDLL"
+	}
+	IF (Company$ = "DOP" ) {
+		SQLCommand$ = "EXEC dbo.spSageMismatchedLotsDOP"
+	}
+	IF (Company$ = "DCA" ) {
+		SQLCommand$ = "EXEC dbo.spSageMismatchedLotsDCA"
+	}
 
 	FGInvRS = CONN'EXECUTE(SQLCommand$)
 	IF (FGInvRS'EOF) {
@@ -51,25 +49,12 @@ RESYNC_ITEM_COST:
 		TierType$ = FGInvRS'Fields("TierType")'Value$
 		GroupSort$ = FGInvRS'Fields("GroupSort")'Value$
 		UDF_FormattedLotNo$ = FGInvRS'Fields("UDF_FormattedLotNo")'Value$
-		CorrectUDF$ = FGInvRS'Fields("CorrectUDF")'Value$
-		fileKey$ = ItemCode$+WarehouseCode$+TierType$+GroupSort$
-		!mwaRetVal = retFAILURE
-		!WRITE(memFH,KEY=fileKey$,ERR=*NEXT)ItemCode$;mwaRetVAl = retSUCCESS
-		!WRITE(memFH,KEY=fileKey$)ItemCode$
-		!counter++
-		!IF (counter = 10) {
-		!	ESCAPE
+		CorrectLotNo$ = FGInvRS'Fields("CorrectLotNo")'Value$
 
-		!}
-		!!IF (NOT(mwaRetVal)) {
-		!!	MSGBOX("Failed")
-		!!	ESCAPE
-		!!	BREAK
-		!!}
 		READ(itemCostFH,REC=costRec$,KEY=ItemCode$:WarehouseCode$:TierType$:GroupSort$,ERR=*NEXT);recFound=1
 		IF (recFound) {
 			! on a matching record to the table. double check its UDF does not match the tables CorrectUDF value and then set it and write
-			IF (costRec.UDF_FormattedLotNo$ <> CorrectUDF$) {
+			IF (costRec.UDF_FormattedLotNo$ <> CorrectLotNo$) {
 				costRec.UDF_FormattedLotNo$ = CorrectUDF$
 				WRITE(itemCostFH,REC=costRec$);writeCount++
 			}
@@ -79,12 +64,28 @@ RESYNC_ITEM_COST:
 
 
 
-	MSGBOX("Utility Finished")
+	!MSGBOX("Utility Finished")
 	_OBJ'FreeSQLQuery(FGInvRS)
 	_OBJ'DeleteObject(CONN)
-	CLOSE(itemCostFH)
-RETURN mwaRetVal
+	CLOSE(itemCostFH); itemCostFH = 0
+
+RETURN writeCount
 !!!!!!!!!
+PROCESS_LOCQTY:
+	!loop through im_itemwarehouse
+	! set the udf_formattedlotno on im404_itemlocationqty to the value of im_itemwarehouse udf_formattedlotno
+
+	itemCostFH = %sys_ss'OpenTable("IM_ItemCost","COMPANY")
+	itemLocFH = %sys_ss'OpenTable("IM404_ItemLocationQuantity","COMPANY")
+	SELECT *, REC=rec$ FROM itemLocFH BEGIN $$ END $FE
+		validRead=0
+		READ(itemCostFH,REC=costRec$,KEY=rec.ItemCode$:rec.WarehouseCode$:"3":rec.LotSerialNo$,ERR=*NEXT);validRead=1
+		IF (rec.UDF_FormattedLotNo$ <> costRec.UDF_FormattedLotNo$) {
+			rec.UDF_FormattedLotNo$ = costRec.UDF_FormattedLotNo$
+			WRITE(itemLocFH,REC=rec$);writeCounter++
+		}
+	NEXT RECORD 
+RETURN writeCounter
 !!!!!!!!!
 OPEN_CONN:
 	ENTER (Server$),(Database$),(Username$),(Password$)
@@ -94,7 +95,6 @@ OPEN_CONN:
 	CONN'Provider$="sqloledb.1"
 	CONN'CommandTimeout=60
 	mwaRetVal=0; CONN'OPEN(ConnStr$,ERR=*NEXT); mwaRetVal=1
-	msgbox(STR(mwaRetVal))
 	IF NOT(mwaRetVal) { _OBJ'LastErrorMsg$="Failed to open connection"; RETURN retFAILURE }
 RETURN CONN
 
